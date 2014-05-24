@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "purge" ]; then
+
+	# Remove users
+	! getent passwd logmailer >/dev/null || deluser --quiet logmailer
+fi
+
+#DEBHELPER#
+
+exit 0

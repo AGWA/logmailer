@@ -1,0 +1,14 @@
+# Path to FIFO ** Must be set for logmailer to start **
+#FIFO_PATH=/var/run/logmailer.pipe
+
+# Who should receive the mail? (default: root)
+RECIPIENT=root
+
+# Subject line for mails
+# %h is replaced with hostname
+# %c is replaced with # of log entries
+# Default: "Log messages from %h"
+SUBJECT="Log messages from %h"
+
+# Extra options to pass to the daemon
+DAEMON_OPTS=

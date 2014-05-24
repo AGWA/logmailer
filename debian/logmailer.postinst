@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ]; then
+
+	# Create users
+	getent passwd logmailer >/dev/null || \
+		adduser --quiet --system --group --home /var/run/logmailer --no-create-home logmailer
+fi
+
+#DEBHELPER#
+
+exit 0;

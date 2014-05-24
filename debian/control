@@ -1,0 +1,15 @@
+Source: logmailer
+Maintainer: Andrew Ayer <agwa@andrewayer.name>
+Section: admin
+Priority: extra
+Standards-Version: 3.9.4
+Build-Depends: debhelper (>= 9), make (>= 3.81-5), libc6-dev (>= 2.7-18), gcc (>= 4:4.3.2-2), coreutils (>= 6.10-6)
+
+Package: logmailer
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, adduser, mail-transport-agent
+Description: send syslog messages via email
+ logmailer reads log messages from a FIFO written to by the syslog daemon
+ and mails the messages to a user-specified email address.  The syslog
+ daemon can be configured to send critical log messages to the FIFO,
+ ensuring that they are seen by the system administrator.

@@ -1,0 +1,108 @@
+#! /bin/sh
+#
+### BEGIN INIT INFO
+# Provides:		logmailer
+# Required-Start:	$remote_fs
+# Required-Stop:	$remote_fs
+# X-Start-Before:	$syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	Start the log mailer daemon
+### END INIT INFO
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/sbin/logmailer
+NAME=logmailer
+DESC="Log Mailer Daemon"
+RUNDIR=/var/run/logmailer
+USER=logmailer
+GROUP=logmailer
+PIDFILE="$RUNDIR/logmailer.pid"
+RECIPIENT=root
+SUBJECT="Log messages from %h"
+FIFO_PATH=
+DAEMON_OPTS=
+
+[ -x "$DAEMON" ] || exit 0
+
+# Include defaults if available
+if [ -f /etc/default/logmailer ]
+then
+	. /etc/default/logmailer
+fi
+
+start() {
+	# Return
+	#   0 if daemon has been started
+	#   1 if daemon was already running
+	#   2 if daemon could not be started
+	if [ -z "$FIFO_PATH" ]
+	then
+		echo "\$FIFO_PATH not set in /etc/default/logmailer - not starting"
+		exit 0
+	fi
+	# Create the run directory if it doesn't exist
+	if [ ! -d "$RUNDIR" ]
+	then
+		install -o "$USER" -g "$GROUP" -m 755 -d "$RUNDIR" || return 2
+	fi
+	# create the FIFO if it doesn't exist
+	if [ ! -e "$FIFO_PATH" ]
+	then
+		mknod -m 640 "$FIFO_PATH" p
+		chown root:adm "$FIFO_PATH"
+	fi
+ 	start-stop-daemon --start --quiet --pidfile "$PIDFILE" --user "$USER" --name "$NAME" --startas "$DAEMON" --test > /dev/null || return 1
+	start-stop-daemon --start --quiet --pidfile "$PIDFILE" --user "$USER" --name "$NAME" --startas "$DAEMON" -- \
+		$DAEMON_OPTS \
+		-u "$USER" \
+		-g "$GROUP" \
+		-p "$PIDFILE" \
+		-r "$RECIPIENT" \
+		-s "$SUBJECT" \
+		-- "$FIFO_PATH" || return 2
+}
+
+stop() {
+	# Return
+	#   0 if daemon has been stopped
+	#   1 if daemon was already stopped
+	#   2 if daemon could not be stopped
+	#   other if a failure occurred
+	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile "$PIDFILE" --name "$NAME" --user "$USER"
+	RETVAL=$?
+	if [ $RETVAL -ne 2 ]
+	then
+		# In case PID file isn't properly deleted:
+		rm -f "$PIDFILE"
+	fi
+	return $RETVAL
+}
+
+command="$1"
+shift
+
+case "$command" in
+	start)
+		echo -n "Starting $DESC: "
+		start || exit $?
+		echo "."
+	;;
+	stop)
+		echo -n "Stopping $DESC: "
+		stop
+		echo "."
+	;;
+	restart|force-reload)
+		echo -n "Restarting $DESC: "
+		stop
+		start || exit $?
+		echo "."
+	;;
+	*)
+		echo "Usage: $0 {start|stop|restart|force-reload}" >&2
+		exit 1
+	;;
+esac
+
+exit 0
