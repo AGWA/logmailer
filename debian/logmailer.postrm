@@ -6,6 +6,10 @@ if [ "$1" = "purge" ]; then
 
 	# Remove users
 	! getent passwd logmailer >/dev/null || deluser --quiet logmailer
+
+	# Clean up remnants of logmailer
+	rmdir /var/run/logmailer 2>/dev/null || true
+	rm -f /var/run/logmailer.pipe || true
 fi
 
 #DEBHELPER#
