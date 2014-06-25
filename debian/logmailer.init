@@ -20,7 +20,7 @@ GROUP=logmailer
 PIDFILE="$RUNDIR/logmailer.pid"
 RECIPIENT=root
 SUBJECT="Log messages from %h"
-FIFO_PATH=
+FIFO_PATH=/var/run/logmailer.pipe
 DAEMON_OPTS=
 
 [ -x "$DAEMON" ] || exit 0
@@ -38,7 +38,7 @@ start() {
 	#   2 if daemon could not be started
 	if [ -z "$FIFO_PATH" ]
 	then
-		echo "\$FIFO_PATH not set in /etc/default/logmailer - not starting"
+		echo "\$FIFO_PATH not set - not starting"
 		exit 0
 	fi
 	# Create the run directory if it doesn't exist
