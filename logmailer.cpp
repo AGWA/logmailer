@@ -103,20 +103,20 @@ static void init_signals ()
 	sigprocmask(SIG_BLOCK, &siginfo.sa_mask, NULL);
 }
 
-static void set_nonblocking (int fd, bool nonblocking)
+static void set_cloexec (int fd, bool cloexec)
 {
-	int		old_flags = fcntl(fd, F_GETFL);
+	int		old_flags = fcntl(fd, F_GETFD);
 	if (old_flags == -1) {
-		throw System_error("fcntl(F_GETFL)", "", errno);
+		throw System_error("fcntl(F_GETFD)", "", errno);
 	}
 	int		new_flags = old_flags;
-	if (nonblocking) {
-		new_flags |= O_NONBLOCK;
+	if (cloexec) {
+		new_flags |= FD_CLOEXEC;
 	} else {
-		new_flags &= ~O_NONBLOCK;
+		new_flags &= ~FD_CLOEXEC;
 	}
-	if (new_flags != old_flags && fcntl(fd, F_SETFL, new_flags) == -1) {
-		throw System_error("fcntl(F_SETFL)", "", errno);
+	if (new_flags != old_flags && fcntl(fd, F_SETFD, new_flags) == -1) {
+		throw System_error("fcntl(F_SETFD)", "", errno);
 	}
 }
 
@@ -249,7 +249,7 @@ static void send_mail (const std::string& to, const std::string& subject, const 
 
 class Log_mailer {
 public:
-	int			fd;
+	std::string		fifo_path;
 	std::string		recipient;
 	std::string		subject_format;
 	std::time_t		min_wait_time;
@@ -263,6 +263,8 @@ private:
 		default_max_buffer_size = 65536
 	};
 
+	int			fd;
+	int			wfd;
 	std::string		buffer;
 	std::string::size_type	last_newline;
 	std::time_t		start_time;	// only valid if last_newline != std::string::npos
@@ -286,19 +288,46 @@ private:
 
 public:
 	Log_mailer ()
-	: fd(-1),
-	  recipient("root"),
+	: recipient("root"),
 	  subject_format("Log messages from %h"),
 	  min_wait_time(default_min_wait_time),
 	  max_wait_time(default_max_wait_time),
 	  max_buffer_size(default_max_buffer_size),
+	  fd(-1),
+	  wfd(-1),
 	  last_newline(std::string::npos)
 	{
 	}
 	~Log_mailer ()
 	{
+		close_fifo();
+	}
+
+	void open_fifo ()
+	{
+		close_fifo();
+
+		if ((fd = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK)) == -1) {
+			throw System_error("open", fifo_path.c_str(), errno);
+		}
+		set_cloexec(fd, true);
+
+		// try opening the FIFO for write so that we never get end-of-file when reading from it
+		wfd = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
+		if (wfd != -1) {
+			set_cloexec(wfd, true);
+		}
+	}
+
+	void close_fifo ()
+	{
+		if (wfd != -1) {
+			close(wfd);
+			wfd = -1;
+		}
 		if (fd != -1) {
 			close(fd);
+			fd = -1;
 		}
 	}
 
@@ -352,6 +381,11 @@ public:
 				}
 				throw System_error("pselect", "", errno);
 			}
+			if (bytes_read == 0) {
+				// need to re-open the FIFO
+				open_fifo();
+				continue;
+			}
 
 			if (const void* newline = std::memchr(read_buffer, '\n', bytes_read)) {
 				if (!has_complete_message()) {
@@ -364,6 +398,10 @@ public:
 			if (has_complete_message() && buffer.size() >= max_buffer_size) {
 				flush();
 			}
+		}
+
+		if (has_complete_message()) {
+			flush();
 		}
 	}
 
@@ -447,15 +485,16 @@ int main (int argc, char** argv)
 			return 2;
 		}
 
+		log_mailer.fifo_path = argv[optind];
+
 		if (no_daemonize && pidfile) {
 			std::clog << argv[0] << ": -p (PID file) can't be specified with -f (don't daemonize)" << std::endl;
 			return 2;
 		}
 
-		if ((log_mailer.fd = open(argv[optind], O_RDONLY)) == -1) {
-			throw System_error("open", argv[optind], errno);
-		}
-		set_nonblocking(log_mailer.fd, true);
+		// Open FIFO before dropping privileges in case FIFO isn't readable by unprivileged user.
+		// Open FIFO before daemonizing so we can report errors.
+		log_mailer.open_fifo();
 
 		drop_privileges(username, groupname);
 		if (!no_daemonize) {
@@ -466,7 +505,6 @@ int main (int argc, char** argv)
 		}
 		init_signals();
 		log_mailer.run(is_running);
-
 	} catch (const System_error& error) {
 		std::clog << argv[0] << ": " << error.syscall;
 		if (!error.target.empty()) {
