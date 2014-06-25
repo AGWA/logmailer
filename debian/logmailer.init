@@ -31,6 +31,9 @@ then
 	. /etc/default/logmailer
 fi
 
+# Define LSB log_* functions.
+. /lib/lsb/init-functions
+
 start() {
 	# Return
 	#   0 if daemon has been started
@@ -84,20 +87,28 @@ shift
 
 case "$command" in
 	start)
-		echo -n "Starting $DESC: "
-		start || exit $?
-		echo "."
+		log_daemon_msg "Starting $DESC" "$NAME"
+		start
+		case "$?" in
+			0) log_end_msg 0;;
+			1) log_progress_msg "already started"
+			   log_end_msg 0;;
+			*) log_end_msg 1;;
+		esac
 	;;
 	stop)
-		echo -n "Stopping $DESC: "
+		log_daemon_msg "Stopping $DESC" "$NAME"
 		stop
-		echo "."
+		case "$?" in
+			0) log_end_msg 0;;
+			1) log_progress_msg "already stopped"
+			   log_end_msg 0;;
+			*) log_end_msg 1;;
+		esac
 	;;
 	restart|force-reload)
-		echo -n "Restarting $DESC: "
-		stop
-		start || exit $?
-		echo "."
+		"$0" stop
+		"$0" start
 	;;
 	*)
 		echo "Usage: $0 {start|stop|restart|force-reload}" >&2
