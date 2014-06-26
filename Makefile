@@ -15,8 +15,8 @@ clean:
 	rm -f *.o $(PROGRAMS)
 
 install:
-	install -d $(DESTDIR)$(PREFIX)/bin
-	install -m 755 $(PROGRAMS) $(DESTDIR)$(PREFIX)/bin/
+	install -d $(DESTDIR)$(PREFIX)/sbin
+	install -m 755 $(PROGRAMS) $(DESTDIR)$(PREFIX)/sbin/
 #	install -d $(DESTDIR)$(PREFIX)/share/man
 #	install -m 644 $(MANPAGES) $(DESTDIR)$(PREFIX)/share/man/
 
