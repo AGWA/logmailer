@@ -1,0 +1,90 @@
+Logmailer is a simple daemon that monitors a named pipe (FIFO) for log
+entries and emails them to the system administrator.  Your syslog daemon
+can be configured to write high priority log entries to this named pipe,
+ensuring that you quickly see and react to critical events.
+
+Logmailer is written to be robust and also aggregates multiple
+back-to-back log messages in a single email to avoid sending a flood
+of emails.
+
+
+USING LOGMAILER
+
+Usage: logmailer [OPTIONS] FIFO_PATH
+
+Options:
+	-r RECIPIENT	Email address where log messages should be sent
+			(default: root).
+	-m MIN_WAIT	Minimum number of seconds of inactivity before
+			sending an email (see below) (default: 5).
+	-M MAX_WAIT	Maximum number of seconds a log entry may be queued
+			before being emailed (see below) (default: 60).
+	-s SUBJECT	Subject for emails (see below).
+	-f		Don't daemonize.
+	-u USER		Run as given user.
+	-g GROUP	Run as given group (default: primary group of USER).
+	-p PIDFILE	After daemonizing, write PID to this file.
+
+FIFO_PATH must exist before starting logmailer.  You can create it with
+the mkfifo command (note: the debian init script does this for you).
+
+To prevent a flood of email messages, logmailer buffers log messages and
+only emails them once MIN_WAIT_TIME seconds of inactivity have passed,
+OR once a message has been buffered for MAX_WAIT_TIME seconds.
+
+SUBJECT may contain the following escape sequences:
+
+	%h	Replaced with hostname.
+	%c	Replaced with number of log entries in email.
+	%%	Replaced with literal '%'.
+
+Note that any other 2 character sequence starting with a % will be ignored
+(i.e. removed from the Subject line).
+
+Once logmailer is running, you can configure your syslog daemon to write
+log messages to the named pipe.  For example, the following rsyslog.conf
+entry sends log messages of priority ALERT or higher to a named pipe:
+
+	*.alert		|/var/run/logmailer.pipe
+
+
+REQUIREMENTS
+
+To build logmailer, you need make and a C++ compiler (e.g. GCC).
+
+To run logmailer, you need the sendmail binary installed, and a syslog daemon
+that supports writing to a named pipe (e.g. rsyslog).
+
+
+HOW TO BUILD
+
+Run './configure', 'make', and 'make install'.
+
+
+CURRENT STATUS
+
+Logmailer is a very short and simple program.  I consider it stable and
+feature complete.  I'll fix bugs if any arise but do not plan on adding
+new features.  I have released the source code mainly in case it's useful
+to someone else.  I can't guarantee I'll develop or support it in any way.
+
+
+DEBIAN PACKAGING
+
+Debian packaging, complete with an init script, can be found in the
+'debian' branch of this Git repository.  The package is built using
+git-buildpackage as follows:
+
+	1. Check out the debian branch: `git checkout debian`
+	2. Build the package: `git-buildpackage -uc -us`
+
+By default, the logmailer Debian package creates and uses
+/var/run/logmailer.pipe as its FIFO.  To change this, edit
+the self-documenting /etc/default/logmailer configuration file.
+
+
+LEGALESE
+
+Copyright (C) 2014 Andrew Ayer <agwa@andrewayer.name>
+Licensed under the MIT/X11 license (see COPYING for details)
+
