@@ -58,7 +58,7 @@ that supports writing to a named pipe (e.g. rsyslog).
 
 HOW TO BUILD
 
-Run './configure', 'make', and 'make install'.
+Run 'make' and 'make install'.
 
 
 CURRENT STATUS
