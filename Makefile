@@ -9,7 +9,7 @@ OBJFILES = logmailer.o
 all: $(PROGRAMS)
 
 logmailer: $(OBJFILES)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJFILES) $(LDFLAGS)
 
 clean:
 	rm -f *.o $(PROGRAMS)
