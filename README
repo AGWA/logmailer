@@ -3,7 +3,8 @@ entries and emails them to the system administrator.  Your syslog daemon
 can be configured to write high priority log entries to this named pipe,
 ensuring that you quickly see and react to critical events.
 
-Logmailer is written to be robust and also aggregates multiple
+Logmailer is written to be robust and gracefully handles the numerous edge
+cases that arise when using named pipes.  It also aggregates multiple
 back-to-back log messages in a single email to avoid sending a flood
 of emails.
 
@@ -28,9 +29,10 @@ Options:
 FIFO_PATH must exist before starting logmailer.  You can create it with
 the mkfifo command (note: the debian init script does this for you).
 
-To prevent a flood of email messages, logmailer buffers log messages and
-only emails them once MIN_WAIT_TIME seconds of inactivity have passed,
-OR once a message has been buffered for MAX_WAIT_TIME seconds.
+To prevent a flood of email messages, logmailer buffers log messages
+and only emails them once MIN_WAIT_TIME seconds of inactivity have
+passed, OR once a message has been buffered for MAX_WAIT_TIME seconds.
+(It may send messages sooner if the buffer fills up.)
 
 SUBJECT may contain the following escape sequences:
 
@@ -38,7 +40,7 @@ SUBJECT may contain the following escape sequences:
 	%c	Replaced with number of log entries in email.
 	%%	Replaced with literal '%'.
 
-Note that any other 2 character sequence starting with a % will be ignored
+Any other two character sequence starting with a % is ignored
 (i.e. removed from the Subject line).
 
 Once logmailer is running, you can configure your syslog daemon to write
@@ -65,8 +67,8 @@ CURRENT STATUS
 
 Logmailer is a very short and simple program.  I consider it stable and
 feature complete.  I'll fix bugs if any arise but do not plan on adding
-new features.  I have released the source code mainly in case it's useful
-to someone else.  I can't guarantee I'll develop or support it in any way.
+new features.  I have released logmailer in case it's useful to someone
+else, but I can't guarantee I'll develop or support it in any way.
 
 
 DEBIAN PACKAGING
