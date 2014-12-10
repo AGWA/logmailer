@@ -49,8 +49,8 @@ static void print_usage (const char* argv0, std::ostream& out =std::clog)
 	out << "Usage: " << argv0 << " [-f] [-u user] [-g group] [-p pidfile] [-m min_wait_time] [-M max_wait_time] [-r recipient] [-s subject] fifo_path" << std::endl;
 }
 
-sig_atomic_t		is_running = 1;
-sig_atomic_t		flush_requested = 0;
+volatile sig_atomic_t	is_running = 1;
+volatile sig_atomic_t	flush_requested = 0;
 std::string		hostname;
 
 struct System_error {
@@ -353,7 +353,7 @@ public:
 		}
 	}
 
-	void run (const sig_atomic_t& is_running, sig_atomic_t& flush_requested)
+	void run (const volatile sig_atomic_t& is_running, volatile sig_atomic_t& flush_requested)
 	{
 		fd_set			rfds;
 		FD_ZERO(&rfds);
