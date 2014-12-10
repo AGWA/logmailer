@@ -288,7 +288,6 @@ private:
 			return;
 		}
 
-
 		const char* const	message = buffer.data();
 		const std::size_t	message_len = last_newline + 1;
 		send_mail(recipient, format_subject(message, message_len), message, message_len);
@@ -361,7 +360,7 @@ public:
 
 				const std::time_t	now = std::time(NULL);
 
-				if (now >= start_time + max_wait_time) {
+				if (now >= start_time + max_wait_time || buffer.size() >= max_buffer_size) {
 					flush();
 				} else if ((start_time + max_wait_time) - now < timeout.tv_sec) {
 					timeout.tv_sec = (start_time + max_wait_time) - now;
@@ -406,9 +405,6 @@ public:
 			}
 
 			buffer.append(read_buffer, bytes_read);
-			if (has_complete_message() && buffer.size() >= max_buffer_size) {
-				flush();
-			}
 		}
 
 		if (has_complete_message()) {
