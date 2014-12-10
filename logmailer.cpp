@@ -367,9 +367,7 @@ public:
 
 			struct timespec	timeout;
 			if (flush_requested) {
-				if (has_complete_message()) {
-					flush();
-				}
+				flush();
 				flush_requested = 0;
 			} else if (has_complete_message()) {
 				timeout.tv_sec = min_wait_time;
@@ -424,9 +422,7 @@ public:
 			buffer.append(read_buffer, bytes_read);
 		}
 
-		if (has_complete_message()) {
-			flush();
-		}
+		flush();
 	}
 
 	std::string format_subject (const char* message, std::size_t message_len) const
