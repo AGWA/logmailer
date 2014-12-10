@@ -205,6 +205,17 @@ static std::size_t count_newlines (const char* p, std::size_t len)
 	return cnt;
 }
 
+static const char* find_last_newline (const char* base, std::size_t len)
+{
+	for (const char* p = base + len; p > base;) {
+		--p;
+		if (*p == '\n') {
+			return p;
+		}
+	}
+	return NULL;
+}
+
 static void send_mail (const std::string& to, const std::string& subject, const char* body, std::size_t body_len)
 {
 	int			pipefd[2];
@@ -387,11 +398,11 @@ public:
 				continue;
 			}
 
-			if (const void* newline = std::memchr(read_buffer, '\n', bytes_read)) {
+			if (const char* newline = find_last_newline(read_buffer, bytes_read)) {
 				if (!has_complete_message()) {
 					start_time = std::time(NULL);
 				}
-				last_newline = buffer.size() + (static_cast<const char*>(newline) - read_buffer);
+				last_newline = buffer.size() + (newline - read_buffer);
 			}
 
 			buffer.append(read_buffer, bytes_read);
