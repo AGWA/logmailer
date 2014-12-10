@@ -346,7 +346,7 @@ public:
 	{
 		fd_set			rfds;
 		FD_ZERO(&rfds);
-		int			nfds = fd + 1;
+		const int		nfds = fd + 1;
 
 		sigset_t		empty_sigset;
 		sigemptyset(&empty_sigset);
@@ -359,7 +359,7 @@ public:
 				timeout.tv_sec = min_wait_time;
 				timeout.tv_nsec = 0;
 
-				std::time_t	now = std::time(NULL);
+				const std::time_t	now = std::time(NULL);
 
 				if (now >= start_time + max_wait_time) {
 					flush();
@@ -368,7 +368,7 @@ public:
 				}
 			}
 
-			int		select_res = pselect(nfds, &rfds, NULL, NULL,
+			const int	select_res = pselect(nfds, &rfds, NULL, NULL,
 								has_complete_message() ? &timeout : NULL,
 								&empty_sigset);
 			if (select_res == -1) {
@@ -385,7 +385,7 @@ public:
 			}
 
 			char		read_buffer[1024];
-			ssize_t		bytes_read = read(fd, read_buffer, sizeof(read_buffer));
+			const ssize_t	bytes_read = read(fd, read_buffer, sizeof(read_buffer));
 			if (bytes_read == -1) {
 				if (errno == EAGAIN) {
 					continue;
