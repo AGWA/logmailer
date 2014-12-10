@@ -50,6 +50,7 @@ static void print_usage (const char* argv0, std::ostream& out =std::clog)
 }
 
 sig_atomic_t		is_running = 1;
+sig_atomic_t		flush_requested = 0;
 std::string		hostname;
 
 struct System_error {
@@ -79,6 +80,11 @@ static void graceful_termination_handler (int)
 	is_running = 0;
 }
 
+static void request_flush_handler (int)
+{
+	flush_requested = 1;
+}
+
 static void init_signals ()
 {
 	struct sigaction		siginfo;
@@ -86,6 +92,7 @@ static void init_signals ()
 	sigemptyset(&siginfo.sa_mask);
 	sigaddset(&siginfo.sa_mask, SIGINT);
 	sigaddset(&siginfo.sa_mask, SIGTERM);
+	sigaddset(&siginfo.sa_mask, SIGUSR1);
 
 	// SIGINT and SIGTERM
 	siginfo.sa_flags = 0;
@@ -93,12 +100,17 @@ static void init_signals ()
 	sigaction(SIGINT, &siginfo, NULL);
 	sigaction(SIGTERM, &siginfo, NULL);
 
+	// SIGUSR1
+	siginfo.sa_flags = 0;
+	siginfo.sa_handler = request_flush_handler;
+	sigaction(SIGUSR1, &siginfo, NULL);
+
 	// SIGPIPE
 	siginfo.sa_flags = 0;
 	siginfo.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &siginfo, NULL);
 
-	// Block SIGINT, SIGTERM, SIGCHLD; they will be unblocked
+	// Block SIGINT, SIGTERM, SIGUSR1; they will be unblocked
 	// at a convenient time
 	sigprocmask(SIG_BLOCK, &siginfo.sa_mask, NULL);
 }
@@ -341,7 +353,7 @@ public:
 		}
 	}
 
-	void run (const sig_atomic_t& is_running)
+	void run (const sig_atomic_t& is_running, sig_atomic_t& flush_requested)
 	{
 		fd_set			rfds;
 		FD_ZERO(&rfds);
@@ -354,7 +366,12 @@ public:
 			FD_SET(fd, &rfds);
 
 			struct timespec	timeout;
-			if (has_complete_message()) {
+			if (flush_requested) {
+				if (has_complete_message()) {
+					flush();
+				}
+				flush_requested = 0;
+			} else if (has_complete_message()) {
 				timeout.tv_sec = min_wait_time;
 				timeout.tv_nsec = 0;
 
@@ -511,7 +528,7 @@ int main (int argc, char** argv)
 			}
 		}
 		init_signals();
-		log_mailer.run(is_running);
+		log_mailer.run(is_running, flush_requested);
 	} catch (const System_error& error) {
 		std::clog << argv[0] << ": " << error.syscall;
 		if (!error.target.empty()) {
