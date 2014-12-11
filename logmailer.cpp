@@ -375,7 +375,10 @@ public:
 
 				const std::time_t	now = std::time(NULL);
 
-				if (now >= start_time + max_wait_time || buffer.size() >= max_buffer_size) {
+				// If now < start_time, it means that the system clock moved backwards. If this
+				// happens, just flush the current messages out so we can start fresh with the
+				// correct time when we receive the next message.
+				if (now < start_time || now >= start_time + max_wait_time || buffer.size() >= max_buffer_size) {
 					flush();
 				} else if ((start_time + max_wait_time) - now < timeout.tv_sec) {
 					timeout.tv_sec = (start_time + max_wait_time) - now;
