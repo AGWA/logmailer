@@ -75,6 +75,24 @@ static std::string get_hostname ()
 	return buffer;
 }
 
+static std::time_t get_time ()
+{
+#if defined(CLOCK_MONOTONIC) || defined(CLOCK_MONOTONIC_RAW)
+	struct timespec tp;
+#if defined(CLOCK_MONOTONIC_RAW)
+	if (clock_gettime(CLOCK_MONOTONIC_RAW, &tp) == 0) {
+		return tp.tv_sec;
+	}
+#endif
+#if defined(CLOCK_MONOTONIC)
+	if (clock_gettime(CLOCK_MONOTONIC, &tp) == 0) {
+		return tp.tv_sec;
+	}
+#endif
+#endif
+	return std::time(NULL);
+}
+
 static void graceful_termination_handler (int)
 {
 	is_running = 0;
@@ -373,7 +391,7 @@ public:
 				timeout.tv_sec = min_wait_time;
 				timeout.tv_nsec = 0;
 
-				const std::time_t	now = std::time(NULL);
+				const std::time_t	now = get_time();
 
 				// If now < start_time, it means that the system clock moved backwards. If this
 				// happens, just flush the current messages out so we can start fresh with the
@@ -417,7 +435,7 @@ public:
 
 			if (const char* newline = find_last_newline(read_buffer, bytes_read)) {
 				if (!has_complete_message()) {
-					start_time = std::time(NULL);
+					start_time = get_time();
 				}
 				last_newline = buffer.size() + (newline - read_buffer);
 			}

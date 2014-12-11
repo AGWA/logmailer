@@ -1,5 +1,6 @@
 CXX = c++
 CXXFLAGS ?= -Wall -Wextra -pedantic -O2
+LDFLAGS += -lrt
 PREFIX = /usr/local
 
 PROGRAMS = logmailer
