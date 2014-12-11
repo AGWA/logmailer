@@ -1,3 +1,10 @@
+logmailer (0.3-1~agwa1) unstable; urgency=low
+
+  * New upstream release.
+  * Install NEWS to docs directory.
+
+ -- Andrew Ayer <agwa@andrewayer.name>  Wed, 10 Dec 2014 18:24:09 -0800
+
 logmailer (0.2-1) unstable; urgency=low
 
   * New upstream release.
