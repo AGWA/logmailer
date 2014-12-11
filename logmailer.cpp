@@ -49,7 +49,8 @@ static void print_usage (const char* argv0, std::ostream& out =std::clog)
 	out << "Usage: " << argv0 << " [-f] [-u user] [-g group] [-p pidfile] [-m min_wait_time] [-M max_wait_time] [-r recipient] [-s subject] fifo_path" << std::endl;
 }
 
-sig_atomic_t		is_running = 1;
+volatile sig_atomic_t	is_running = 1;
+volatile sig_atomic_t	flush_requested = 0;
 std::string		hostname;
 
 struct System_error {
@@ -74,9 +75,32 @@ static std::string get_hostname ()
 	return buffer;
 }
 
+static std::time_t get_time ()
+{
+#if defined(CLOCK_MONOTONIC) || defined(CLOCK_MONOTONIC_RAW)
+	struct timespec tp;
+#if defined(CLOCK_MONOTONIC_RAW)
+	if (clock_gettime(CLOCK_MONOTONIC_RAW, &tp) == 0) {
+		return tp.tv_sec;
+	}
+#endif
+#if defined(CLOCK_MONOTONIC)
+	if (clock_gettime(CLOCK_MONOTONIC, &tp) == 0) {
+		return tp.tv_sec;
+	}
+#endif
+#endif
+	return std::time(NULL);
+}
+
 static void graceful_termination_handler (int)
 {
 	is_running = 0;
+}
+
+static void request_flush_handler (int)
+{
+	flush_requested = 1;
 }
 
 static void init_signals ()
@@ -86,6 +110,7 @@ static void init_signals ()
 	sigemptyset(&siginfo.sa_mask);
 	sigaddset(&siginfo.sa_mask, SIGINT);
 	sigaddset(&siginfo.sa_mask, SIGTERM);
+	sigaddset(&siginfo.sa_mask, SIGUSR1);
 
 	// SIGINT and SIGTERM
 	siginfo.sa_flags = 0;
@@ -93,12 +118,17 @@ static void init_signals ()
 	sigaction(SIGINT, &siginfo, NULL);
 	sigaction(SIGTERM, &siginfo, NULL);
 
+	// SIGUSR1
+	siginfo.sa_flags = 0;
+	siginfo.sa_handler = request_flush_handler;
+	sigaction(SIGUSR1, &siginfo, NULL);
+
 	// SIGPIPE
 	siginfo.sa_flags = 0;
 	siginfo.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &siginfo, NULL);
 
-	// Block SIGINT, SIGTERM, SIGCHLD; they will be unblocked
+	// Block SIGINT, SIGTERM, SIGUSR1; they will be unblocked
 	// at a convenient time
 	sigprocmask(SIG_BLOCK, &siginfo.sa_mask, NULL);
 }
@@ -205,6 +235,17 @@ static std::size_t count_newlines (const char* p, std::size_t len)
 	return cnt;
 }
 
+static const char* find_last_newline (const char* base, std::size_t len)
+{
+	for (const char* p = base + len; p > base;) {
+		--p;
+		if (*p == '\n') {
+			return p;
+		}
+	}
+	return NULL;
+}
+
 static void send_mail (const std::string& to, const std::string& subject, const char* body, std::size_t body_len)
 {
 	int			pipefd[2];
@@ -277,7 +318,6 @@ private:
 			return;
 		}
 
-
 		const char* const	message = buffer.data();
 		const std::size_t	message_len = last_newline + 1;
 		send_mail(recipient, format_subject(message, message_len), message, message_len);
@@ -331,11 +371,11 @@ public:
 		}
 	}
 
-	void run (const sig_atomic_t& is_running)
+	void run (const volatile sig_atomic_t& is_running, volatile sig_atomic_t& flush_requested)
 	{
 		fd_set			rfds;
 		FD_ZERO(&rfds);
-		int			nfds = fd + 1;
+		const int		nfds = fd + 1;
 
 		sigset_t		empty_sigset;
 		sigemptyset(&empty_sigset);
@@ -344,20 +384,26 @@ public:
 			FD_SET(fd, &rfds);
 
 			struct timespec	timeout;
-			if (has_complete_message()) {
+			if (flush_requested) {
+				flush();
+				flush_requested = 0;
+			} else if (has_complete_message()) {
 				timeout.tv_sec = min_wait_time;
 				timeout.tv_nsec = 0;
 
-				std::time_t	now = std::time(NULL);
+				const std::time_t	now = get_time();
 
-				if (now >= start_time + max_wait_time) {
+				// If now < start_time, it means that the system clock moved backwards. If this
+				// happens, just flush the current messages out so we can start fresh with the
+				// correct time when we receive the next message.
+				if (now < start_time || now >= start_time + max_wait_time || buffer.size() >= max_buffer_size) {
 					flush();
 				} else if ((start_time + max_wait_time) - now < timeout.tv_sec) {
 					timeout.tv_sec = (start_time + max_wait_time) - now;
 				}
 			}
 
-			int		select_res = pselect(nfds, &rfds, NULL, NULL,
+			const int	select_res = pselect(nfds, &rfds, NULL, NULL,
 								has_complete_message() ? &timeout : NULL,
 								&empty_sigset);
 			if (select_res == -1) {
@@ -374,7 +420,7 @@ public:
 			}
 
 			char		read_buffer[1024];
-			ssize_t		bytes_read = read(fd, read_buffer, sizeof(read_buffer));
+			const ssize_t	bytes_read = read(fd, read_buffer, sizeof(read_buffer));
 			if (bytes_read == -1) {
 				if (errno == EAGAIN) {
 					continue;
@@ -387,22 +433,17 @@ public:
 				continue;
 			}
 
-			if (const void* newline = std::memchr(read_buffer, '\n', bytes_read)) {
+			if (const char* newline = find_last_newline(read_buffer, bytes_read)) {
 				if (!has_complete_message()) {
-					start_time = std::time(NULL);
+					start_time = get_time();
 				}
-				last_newline = buffer.size() + (static_cast<const char*>(newline) - read_buffer);
+				last_newline = buffer.size() + (newline - read_buffer);
 			}
 
 			buffer.append(read_buffer, bytes_read);
-			if (has_complete_message() && buffer.size() >= max_buffer_size) {
-				flush();
-			}
 		}
 
-		if (has_complete_message()) {
-			flush();
-		}
+		flush();
 	}
 
 	std::string format_subject (const char* message, std::size_t message_len) const
@@ -504,7 +545,7 @@ int main (int argc, char** argv)
 			}
 		}
 		init_signals();
-		log_mailer.run(is_running);
+		log_mailer.run(is_running, flush_requested);
 	} catch (const System_error& error) {
 		std::clog << argv[0] << ": " << error.syscall;
 		if (!error.target.empty()) {

@@ -1,5 +1,6 @@
 CXX = c++
 CXXFLAGS ?= -Wall -Wextra -pedantic -O2
+LDFLAGS += -lrt
 PREFIX = /usr/local
 
 PROGRAMS = logmailer
@@ -9,14 +10,14 @@ OBJFILES = logmailer.o
 all: $(PROGRAMS)
 
 logmailer: $(OBJFILES)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJFILES) $(LDFLAGS)
 
 clean:
 	rm -f *.o $(PROGRAMS)
 
 install:
-	install -d $(DESTDIR)$(PREFIX)/bin
-	install -m 755 $(PROGRAMS) $(DESTDIR)$(PREFIX)/bin/
+	install -d $(DESTDIR)$(PREFIX)/sbin
+	install -m 755 $(PROGRAMS) $(DESTDIR)$(PREFIX)/sbin/
 #	install -d $(DESTDIR)$(PREFIX)/share/man
 #	install -m 644 $(MANPAGES) $(DESTDIR)$(PREFIX)/share/man/
 

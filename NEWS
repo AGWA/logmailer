@@ -1,0 +1,12 @@
+v0.3 (2014-12-10)
+  * Fix bug where messages were delayed when multiple messages arrived
+    at once.
+  * Send all queued messages upon receipt of SIGUSR1.
+  * Be resilient to system clock changes.
+  * Make Makefile cross-platform.
+
+v0.2 (2014-06-25)
+  * Add README.
+
+v0.1 (2014-06-25)
+  * Initial release.
